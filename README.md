@@ -29,6 +29,15 @@ java -jar target/razzies-api-1.0.0-SNAPSHOT.jar
 
 A API sobe em `http://localhost:8080`.
 
+### Interface web
+
+Abra **http://localhost:8080/** para uma interface simples, servida pela própria aplicação
+(`src/main/resources/static/index.html`, HTML e JavaScript puros, sem build). O menu lateral lista os
+resources (**Producers**, **Movies**, **Studios**) e, como submenus, as ações de cada um (listar com
+filtros e paginação, buscar por ID, criar, atualizar, excluir). A tela inicial é o
+**Award intervals**, o endpoint da avaliação, com os produtores de menor e maior intervalo. Cada tela
+mostra a requisição HTTP feita, o status, o resultado em tabela e o JSON da resposta.
+
 ### Usando outro CSV
 
 Por padrão é carregado `src/main/resources/data/movielist.csv` (cópia do `Movielist.csv` da proposta).
@@ -48,10 +57,15 @@ year;title;studios;producers;winner
 ```
 
 - Produtores separados por `,` e/ou `and` (`A, B and C`, `A, B, and C`); estúdios por `,`.
-- `winner`: `yes` (sem diferenciar maiúsculas) para vencedor; vazio ou `no` para indicado.
+- Valores podem vir entre aspas duplas (`"Producer A"`, `"Studio 1, Studio 2"`, `""` escapa uma aspa).
+- `winner`: `yes`, `y` ou `true` (sem diferenciar maiúsculas) para vencedor; qualquer outro valor
+  (vazio, `no`...) é indicado. Valores inesperados geram um aviso no log, sem impedir a carga.
+- Linhas do mesmo filme (mesmo ano e título, ignorando maiúsculas e espaços extras) são **mescladas**:
+  produtores e estúdios são unidos e o filme é vencedor se alguma linha disser que é. Assim uma linha
+  repetida não vira uma segunda vitória no mesmo ano, e nenhum produtor é perdido.
 - Espaços extras, linhas em branco, BOM UTF-8 e quebras de linha `CRLF` são tolerados.
-- Conteúdo inválido (ano não numérico, título vazio, coluna ausente, arquivo inexistente)
-  **interrompe a inicialização** com a linha do erro, para nunca servir resultados incorretos.
+- Conteúdo inválido (ano não numérico, título vazio, coluna ausente, aspas não fechadas, arquivo
+  inexistente) **interrompe a inicialização** com a linha do erro, para nunca servir resultados incorretos.
 
 ## Executando os testes
 
@@ -65,10 +79,11 @@ O projeto contém **somente testes de integração** (`*IT.java`): cada um sobe 
 | Classe | O que garante |
 |---|---|
 | `AwardIntervalsIT` | Resposta exata de `/award-intervals` para o CSV da proposta |
-| `AwardIntervalScenariosIT` | Outros conjuntos de dados (`src/test/resources/csv`): empates em min/max, mesmo produtor em min e max, apenas vitórias **consecutivas**, indicações ignoradas, vitórias no mesmo ano, nenhum intervalo, variações de formato do CSV |
+| `AwardIntervalScenariosIT` | Outros conjuntos de dados (`src/test/resources/csv`): empates em min/max, mesmo produtor em min e max, apenas vitórias **consecutivas**, indicações ignoradas, vitórias no mesmo ano, nenhum intervalo, variações de formato do CSV, valores entre aspas, filmes duplicados e valores de `winner` |
 | `MovieDataLoadIT` | Carga completa (206 filmes, 42 vencedores), separação de produtores e falha de inicialização com CSV inválido |
 | `MovieApiIT` | CRUD de filmes, paginação, filtros, status HTTP e corpo de erro |
 | `ProducerAndStudioApiIT` | Consulta de produtores e estúdios |
+| `WebUiIT` | A interface web é servida pela aplicação |
 
 ## API
 
@@ -127,6 +142,34 @@ estado atual da base.
 - Health check: `http://localhost:8080/actuator/health`
 - Console do H2: `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:razzies`, usuário `sa`, sem senha)
 
+## Arquitetura
+
+Arquitetura **hexagonal** (portas e adaptadores), organizada **por feature** (`movie`, `producer`,
+`studio`, `dataload`, `shared`). Cada feature tem as mesmas camadas:
+
+```
+<feature>/
+├── domain/                     Modelo e regras de negócio, Java puro (sem Spring nem JPA)
+├── application/
+│   ├── port/in/                Portas de entrada: casos de uso (interfaces) e seus comandos
+│   ├── port/out/               Portas de saída: o que o núcleo precisa do mundo externo (repositórios)
+│   └── *Service                Implementação dos casos de uso, orquestrando domínio e portas de saída
+└── adapter/
+    ├── in/web/                 Adaptador de entrada HTTP: controllers e DTOs de request/response
+    ├── in/csv/                 (dataload) Adaptador de entrada que lê o CSV na inicialização
+    └── out/persistence/        Adaptador de saída JPA: entidades, Spring Data e implementação das portas
+```
+
+- As dependências apontam sempre para dentro: `adapter → application → domain`. Nem o domínio nem a
+  aplicação importam classes de adaptadores, de JPA ou de Spring MVC.
+- Exemplo: `GET /award-intervals` entra por `ProducerController` (adaptador web), chama a porta
+  `GetAwardIntervalsUseCase`, implementada por `AwardIntervalService`, que lê as vitórias pela porta
+  `ProducerWinRepository` (implementada por `ProducerWinPersistenceAdapter`, uma única consulta JPQL)
+  e aplica a regra de domínio `AwardIntervalCalculator`.
+- A paginação usa tipos próprios (`PageQuery`, `PageResult`), traduzidos de/para Spring Data nos adaptadores.
+- Concessão pragmática: os serviços de aplicação usam `@Service` e `@Transactional` do Spring, para não
+  duplicar a gestão de transações em uma camada extra.
+
 ## Decisões de projeto
 
 - **Stack:** Java 21, Spring Boot 4.1 (Web MVC, Data JPA, Validation, Actuator), H2, Commons CSV, springdoc-openapi.
@@ -140,7 +183,7 @@ estado atual da base.
   dos vencedores.
 - **Carga antes de aceitar requisições:** o CSV é importado antes de o servidor web subir, numa
   única transação (tudo ou nada), com inserções em lote e resolução de produtores e estúdios em
-  uma consulta. Linhas duplicadas (mesmo ano e título) são ignoradas com um aviso no log, porque
+  uma consulta. Linhas duplicadas (mesmo ano e título) são mescladas com um aviso no log, porque
   contariam como uma segunda vitória no mesmo ano.
 - **REST nível 2 de Richardson:** recursos nomeados por substantivos, verbos HTTP com semântica
   correta, status codes adequados (`201` + `Location`, `204`, `404`, `405`...), DTOs desacoplados
