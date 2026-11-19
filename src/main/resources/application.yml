@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: razzies-api
+  datasource:
+    url: jdbc:h2:mem:razzies;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        jdbc.batch_size: 50
+        order_inserts: true
+        default_batch_fetch_size: 50
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+  mvc:
+    problemdetails:
+      enabled: true
+
+razzies:
+  data:
+    # CSV loaded on startup. Accepts any Spring resource location, e.g.
+    #   --razzies.data.csv-location=file:/path/to/movielist.csv
+    csv-location: classpath:data/movielist.csv
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  # Explicitly enabled: this is an evaluation project. Disable both in a real production deployment.
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
