@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Razzies API</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --border: #e3e6ec;
+    --accent: #b4232a; --accent-soft: #fdecec; --ok: #12805c; --err: #b42318; --code: #f1f3f6;
+    --get: #1d6fd6; --post: #12805c; --put: #b26b00; --delete: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1a1e26; --text: #e6e8ec; --muted: #98a2b3; --border: #2a303b;
+      --accent: #f0646b; --accent-soft: #3a1d20; --ok: #4cc38a; --err: #f97066; --code: #232833;
+      --get: #6aa8ff; --post: #4cc38a; --put: #f5b14c; --delete: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 17px; margin: 0; }
+  header .links { margin-left: auto; display: flex; gap: 16px; }
+  header a { color: var(--muted); text-decoration: none; font-size: 13px; }
+  header a:hover { color: var(--text); }
+  .layout { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 52px); }
+  nav { background: var(--panel); border-right: 1px solid var(--border); padding: 12px 0; }
+  nav .group { margin-bottom: 8px; }
+  nav .group-title { padding: 6px 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  nav button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 20px 7px 28px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  nav button:hover { background: var(--code); }
+  nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+  nav button.featured { font-weight: 600; }
+  .verb { font-size: 10px; font-weight: 700; min-width: 44px; font-family: ui-monospace, monospace; }
+  .verb.GET { color: var(--get); } .verb.POST { color: var(--post); } .verb.PUT { color: var(--put); } .verb.DELETE { color: var(--delete); }
+  .star { margin-left: auto; color: var(--accent); }
+  main { padding: 24px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 18px; }
+  .card p.desc { margin: 0 0 16px; color: var(--muted); }
+  .endpoint { display: inline-flex; gap: 8px; align-items: center; font-family: ui-monospace, monospace; font-size: 13px; background: var(--code); padding: 4px 10px; border-radius: 6px; margin-bottom: 16px; overflow-wrap: anywhere; }
+  form { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  label.wide { grid-column: 1 / -1; }
+  input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; }
+  textarea { min-height: 70px; resize: vertical; }
+  button.primary { font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.secondary { font: inherit; color: var(--text); background: var(--code); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .badge { font-weight: 700; padding: 2px 8px; border-radius: 6px; color: #fff; }
+  .badge.ok { background: var(--ok); } .badge.err { background: var(--err); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--muted); }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); }
+  pre { background: var(--code); padding: 12px; border-radius: 8px; overflow: auto; font-size: 12px; margin: 8px 0 0; }
+  .intervals { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .interval-box { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .interval-box h3 { margin: 0 0 4px; font-size: 15px; }
+  .interval-box .big { font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .interval-box .unit { color: var(--muted); margin-bottom: 8px; }
+  .empty { color: var(--muted); font-style: italic; }
+  .yes { color: var(--ok); font-weight: 600; }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { border-right: 0; border-bottom: 1px solid var(--border); }
+    .intervals { grid-template-columns: 1fr; }
+    main { padding: 16px; }
+    header .links { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 Golden Raspberry Awards API</h1>
+  <div class="links">
+    <a href="/swagger-ui.html">Swagger UI</a>
+    <a href="/actuator/health">Health</a>
+    <a href="/h2-console">H2 console</a>
+  </div>
+</header>
+<div class="layout">
+  <nav id="menu"></nav>
+  <main id="main"></main>
+</div>
+
+<script>
+'use strict';
+
+const API = '/api/v1';
+
+/*
+ * Each resource is a menu and each action a submenu. An action declares its HTTP method, its path,
+ * the form fields it needs and how to render the response.
+ */
+const RESOURCES = [
+  {
+    name: 'Producers',
+    actions: [
+      {
+        id: 'award-intervals', label: 'Award intervals', method: 'GET', featured: true,
+        path: () => `${API}/producers/award-intervals`,
+        description: 'Produtor com maior intervalo entre dois prêmios consecutivos e o que obteve dois prêmios mais rápido (requisito da avaliação).',
+        fields: [], auto: true, render: renderIntervals,
+      },
+      {
+        id: 'producers-list', label: 'Listar', method: 'GET',
+        path: (v) => `${API}/producers` + query({ name: v.name, page: v.page, size: v.size, sort: v.sort }),
+        description: 'Lista paginada de produtores, com filtro opcional por nome.',
+        fields: [field('name', 'Nome contém'), ...pageFields('name')], auto: true, render: renderNamedPage,
+      },
+      {
+        id: 'producers-get', label: 'Buscar por ID', method: 'GET',
+        path: (v) => `${API}/producers/${encodeURIComponent(v.id)}`,
+        description: 'Um produtor pelo seu identificador.',
+        fields: [field('id', 'ID', 'number', true)], render: renderNamed,
+      },
+    ],
+  },
+  {
+    name: 'Movies',
+    actions: [
+      {
+        id: 'movies-list', label: 'Listar', method: 'GET',
+        path: (v) => `${API}/movies` + query({ year: v.year, winner: v.winner, title: v.title, producer: v.producer,
+          studio: v.studio, page: v.page, size: v.size, sort: v.sort }),
+        description: 'Lista paginada de filmes indicados. Todos os filtros são opcionais e combinados com AND.',
+        fields: [
+          field('year', 'Ano', 'number'),
+          { name: 'winner', label: 'Vencedor', type: 'select', options: [['', 'Todos'], ['true', 'Sim'], ['false', 'Não']] },
+          field('title', 'Título contém'), field('producer', 'Produtor contém'), field('studio', 'Estúdio contém'),
+          ...pageFields('year,asc'),
+        ],
+        auto: true, render: renderMoviePage,
+      },
+      {
+        id: 'movies-get', label: 'Buscar por ID', method: 'GET',
+        path: (v) => `${API}/movies/${encodeURIComponent(v.id)}`,
+        description: 'Um filme pelo seu identificador.',
+        fields: [field('id', 'ID', 'number', true)], render: renderMovie,
+      },
+      {
+        id: 'movies-create', label: 'Criar', method: 'POST',
+        path: () => `${API}/movies`,
+        description: 'Cria um filme. Produtores e estúdios são informados por nome (um por linha) e reaproveitados se já existirem.',
+        fields: movieFields(), body: movieBody, render: renderMovie,
+      },
+      {
+        id: 'movies-replace', label: 'Atualizar', method: 'PUT',
+        path: (v) => `${API}/movies/${encodeURIComponent(v.id)}`,
+        description: 'Substitui todos os dados de um filme existente.',
+        fields: [field('id', 'ID', 'number', true), ...movieFields()], body: movieBody, render: renderMovie,
+      },
+      {
+        id: 'movies-delete', label: 'Excluir', method: 'DELETE',
+        path: (v) => `${API}/movies/${encodeURIComponent(v.id)}`,
+        description: 'Remove um filme. O intervalo de prêmios passa a desconsiderá-lo.',
+        fields: [field('id', 'ID', 'number', true)], render: () => text('p', 'Filme excluído.'),
+      },
+    ],
+  },
+  {
+    name: 'Studios',
+    actions: [
+      {
+        id: 'studios-list', label: 'Listar', method: 'GET',
+        path: (v) => `${API}/studios` + query({ name: v.name, page: v.page, size: v.size, sort: v.sort }),
+        description: 'Lista paginada de estúdios, com filtro opcional por nome.',
+        fields: [field('name', 'Nome contém'), ...pageFields('name')], auto: true, render: renderNamedPage,
+      },
+      {
+        id: 'studios-get', label: 'Buscar por ID', method: 'GET',
+        path: (v) => `${API}/studios/${encodeURIComponent(v.id)}`,
+        description: 'Um estúdio pelo seu identificador.',
+        fields: [field('id', 'ID', 'number', true)], render: renderNamed,
+      },
+    ],
+  },
+];
+
+/* ---------- field helpers ---------- */
+
+function field(name, label, type = 'text', required = false) {
+  return { name, label, type, required };
+}
+
+function pageFields(sort) {
+  return [
+    { name: 'page', label: 'Página', type: 'number', value: '0' },
+    { name: 'size', label: 'Itens por página', type: 'number', value: '20' },
+    { name: 'sort', label: 'Ordenação', type: 'text', value: sort },
+  ];
+}
+
+function movieFields() {
+  return [
+    field('year', 'Ano', 'number', true),
+    field('title', 'Título', 'text', true),
+    { name: 'winner', label: 'Vencedor', type: 'select', options: [['false', 'Não'], ['true', 'Sim']] },
+    { name: 'producers', label: 'Produtores (um por linha)', type: 'textarea' },
+    { name: 'studios', label: 'Estúdios (um por linha)', type: 'textarea' },
+  ];
+}
+
+function movieBody(v) {
+  const lines = (s) => (s || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  return {
+    year: v.year === '' ? null : Number(v.year),
+    title: v.title,
+    winner: v.winner === 'true',
+    producers: lines(v.producers),
+    studios: lines(v.studios),
+  };
+}
+
+function query(params) {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && String(v).trim() !== '') q.append(k, String(v).trim()); });
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
+/* ---------- DOM helpers (textContent only: API data is never parsed as HTML) ---------- */
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k === 'class') node.className = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (v !== false && v !== undefined && v !== null) node.setAttribute(k, v === true ? '' : v);
+  });
+  children.flat().forEach((c) => node.append(c instanceof Node ? c : document.createTextNode(String(c))));
+  return node;
+}
+
+function text(tag, value, cls) {
+  return el(tag, cls ? { class: cls } : {}, value);
+}
+
+function table(headers, rows) {
+  if (!rows.length) return text('p', 'Nenhum resultado.', 'empty');
+  return el('div', { class: 'table-wrap' },
+    el('table', {},
+      el('thead', {}, el('tr', {}, headers.map((h) => text('th', h)))),
+      el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c) => (c instanceof Node ? el('td', {}, c) : text('td', c ?? ''))))))));
+}
+
+/* ---------- renderers ---------- */
+
+function renderIntervals(data) {
+  const box = (title, unitText, items) => {
+    const value = items.length ? items[0].interval : '–';
+    return el('div', { class: 'interval-box' },
+      text('h3', title),
+      el('div', { class: 'big' }, String(value)),
+      text('div', unitText, 'unit'),
+      table(['Produtor', 'Intervalo', 'Prêmio anterior', 'Prêmio seguinte'],
+        items.map((i) => [i.producer, i.interval, i.previousWin, i.followingWin])));
+  };
+  return el('div', { class: 'intervals' },
+    box('Mínimo: dois prêmios mais rápido', 'ano(s) entre vitórias consecutivas', data.min || []),
+    box('Máximo: maior intervalo entre prêmios', 'ano(s) entre vitórias consecutivas', data.max || []));
+}
+
+function names(list) {
+  return (list || []).map((x) => x.name).join(', ');
+}
+
+function renderMovieRows(movies) {
+  return table(['ID', 'Ano', 'Título', 'Vencedor', 'Produtores', 'Estúdios'],
+    movies.map((m) => [m.id, m.year, m.title, m.winner ? text('span', 'Sim', 'yes') : 'Não', names(m.producers), names(m.studios)]));
+}
+
+function renderMovie(m) {
+  return renderMovieRows([m]);
+}
+
+function renderMoviePage(data, rerun) {
+  return [renderMovieRows(data.content), pager(data.page, rerun)];
+}
+
+function renderNamed(r) {
+  return table(['ID', 'Nome'], [[r.id, r.name]]);
+}
+
+function renderNamedPage(data, rerun) {
+  return [table(['ID', 'Nome'], data.content.map((r) => [r.id, r.name])), pager(data.page, rerun)];
+}
+
+function pager(page, rerun) {
+  const last = Math.max(page.totalPages - 1, 0);
+  return el('div', { class: 'pager' },
+    el('button', { class: 'secondary', disabled: page.number <= 0, onclick: () => rerun({ page: page.number - 1 }) }, '← Anterior'),
+    el('span', {}, `Página ${page.number + 1} de ${Math.max(page.totalPages, 1)} · ${page.totalElements} itens`),
+    el('button', { class: 'secondary', disabled: page.number >= last, onclick: () => rerun({ page: page.number + 1 }) }, 'Próxima →'));
+}
+
+/* ---------- screens ---------- */
+
+const menu = document.getElementById('menu');
+const main = document.getElementById('main');
+const allActions = RESOURCES.flatMap((r) => r.actions.map((a) => Object.assign(a, { resource: r.name })));
+
+function buildMenu(activeId) {
+  menu.replaceChildren(...RESOURCES.map((resource) =>
+    el('div', { class: 'group' },
+      text('div', resource.name, 'group-title'),
+      resource.actions.map((a) =>
+        el('button', {
+          class: [a.id === activeId ? 'active' : '', a.featured ? 'featured' : ''].join(' ').trim(),
+          onclick: () => { location.hash = a.id; },
+        },
+        text('span', a.method, `verb ${a.method}`), a.label, a.featured ? text('span', '★', 'star') : '')))));
+}
+
+function show(action) {
+  buildMenu(action.id);
+  const result = el('div');
+  const endpoint = el('div', { class: 'endpoint' }, text('span', action.method, `verb ${action.method}`), text('span', action.path(defaults(action))));
+  const form = el('form', {},
+    action.fields.map(inputFor),
+    el('div', {}, el('button', { class: 'primary', type: 'submit' }, action.method === 'GET' ? 'Consultar' : 'Executar')));
+
+  const run = async (overrides = {}) => {
+    Object.entries(overrides).forEach(([k, v]) => { if (form.elements[k]) form.elements[k].value = v; });
+    const values = Object.fromEntries(new FormData(form).entries());
+    const url = action.path(values);
+    endpoint.lastChild.textContent = url;
+    result.replaceChildren(text('p', 'Carregando...', 'empty'));
+    const init = { method: action.method, headers: { Accept: 'application/json' } };
+    if (action.body) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(action.body(values));
+    }
+    try {
+      const response = await fetch(url, init);
+      const raw = await response.text();
+      const data = raw ? JSON.parse(raw) : null;
+      const status = el('div', { class: 'status' },
+        el('span', { class: `badge ${response.ok ? 'ok' : 'err'}` }, String(response.status)),
+        text('span', `${action.method} ${url}`));
+      const location = response.headers.get('Location');
+      if (location) status.append(text('span', `Location: ${location}`));
+      const body = response.ok ? action.render(data, run) : problem(data);
+      result.replaceChildren(status, ...[body].flat(),
+        data ? el('details', {}, text('summary', 'JSON da resposta'), text('pre', JSON.stringify(data, null, 2))) : '');
+    } catch (e) {
+      result.replaceChildren(text('p', `Erro ao chamar a API: ${e.message}`, 'empty'));
+    }
+  };
+
+  form.addEventListener('submit', (e) => { e.preventDefault(); run(); });
+  main.replaceChildren(
+    el('div', { class: 'card' },
+      text('h2', `${action.featured ? '★ ' : ''}${action.resource} · ${action.label}`),
+      text('p', action.description, 'desc'),
+      endpoint,
+      action.fields.length ? form : ''),
+    el('div', { class: 'card' }, result));
+  if (action.auto) run();
+  else result.replaceChildren(text('p', 'Preencha os campos e execute a ação.', 'empty'));
+}
+
+function defaults(action) {
+  return Object.fromEntries(action.fields.map((f) => [f.name, f.value || '']));
+}
+
+function inputFor(f) {
+  let input;
+  if (f.type === 'select') {
+    input = el('select', { name: f.name }, f.options.map(([value, label]) => el('option', { value }, label)));
+  } else if (f.type === 'textarea') {
+    input = el('textarea', { name: f.name });
+  } else {
+    input = el('input', { name: f.name, type: f.type, required: f.required, value: f.value || '', min: f.type === 'number' ? '0' : null });
+  }
+  return el('label', { class: f.type === 'textarea' ? 'wide' : '' }, f.label + (f.required ? ' *' : ''), input);
+}
+
+function problem(data) {
+  if (!data) return text('p', 'Sem conteúdo.', 'empty');
+  const parts = [text('p', `${data.title || 'Erro'}${data.detail ? ': ' + data.detail : ''}`)];
+  if (data.errors) parts.push(table(['Campo', 'Erro'], Object.entries(data.errors)));
+  return parts;
+}
+
+function route() {
+  const id = location.hash.slice(1);
+  show(allActions.find((a) => a.id === id) || allActions[0]);
+}
+
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

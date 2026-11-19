@@ -124,4 +124,63 @@ class AwardIntervalScenariosIT {
                     """);
         }
     }
+
+    @Nested
+    @TestPropertySource(properties = "razzies.data.csv-location=classpath:csv/quoted-values.csv")
+    class QuotedValues extends Scenario {
+
+        @Test
+        void unquotesValuesSoTheSameProducerIsRecognizedInEveryRow() throws Exception {
+            // "Producer A" (quoted) and Producer A (unquoted) are the same producer.
+            assertAwardIntervals("""
+                    {
+                      "min": [
+                        { "producer": "Producer B", "interval": 2, "previousWin": 2010, "followingWin": 2012 }
+                      ],
+                      "max": [
+                        { "producer": "Producer A", "interval": 6, "previousWin": 2004, "followingWin": 2010 }
+                      ]
+                    }
+                    """);
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = "razzies.data.csv-location=classpath:csv/duplicated-movies.csv")
+    class DuplicatedMovies extends Scenario {
+
+        @Test
+        void mergesRowsOfTheSameMovieWithoutLosingProducersOrCountingTwice() throws Exception {
+            // Movie A (2000) appears twice with different producers; Movie B (2003) is repeated verbatim.
+            assertAwardIntervals("""
+                    {
+                      "min": [
+                        { "producer": "Producer B", "interval": 3, "previousWin": 2000, "followingWin": 2003 }
+                      ],
+                      "max": [
+                        { "producer": "Producer A", "interval": 10, "previousWin": 2000, "followingWin": 2010 }
+                      ]
+                    }
+                    """);
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = "razzies.data.csv-location=classpath:csv/winner-values.csv")
+    class WinnerValues extends Scenario {
+
+        @Test
+        void acceptsYesYAndTrueAsWinnersAndTreatsAnythingElseAsNominee() throws Exception {
+            assertAwardIntervals("""
+                    {
+                      "min": [
+                        { "producer": "Producer B", "interval": 2, "previousWin": 2006, "followingWin": 2008 }
+                      ],
+                      "max": [
+                        { "producer": "Producer A", "interval": 5, "previousWin": 2000, "followingWin": 2005 }
+                      ]
+                    }
+                    """);
+        }
+    }
 }

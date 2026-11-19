@@ -1,0 +1,5 @@
+year;title;studios;producers;winner
+2000;"Movie A";"Studio 1, Studio 2";"Producer A";yes
+2004;Movie "B";Studio 1;Producer A;"yes"
+2010;"Movie ""C""";"Studio 3";"Producer A and Producer B";yes
+2012;Movie D;Studio 3;"Producer B";YES

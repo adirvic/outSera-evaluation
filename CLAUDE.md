@@ -17,3 +17,7 @@ Outsera back-end evaluation: Golden Raspberry Awards (Worst Picture) REST API. T
   the interval rule, add a scenario CSV in `src/test/resources/csv` and a case in `AwardIntervalScenariosIT`.
 - Every AI interaction must be kept in `docs/ai-log/` (spec requirement).
 - Package by feature: `movie`, `producer`, `studio`, `dataload`, `shared`.
+- Hexagonal architecture inside each feature: `domain` (plain Java, no Spring/JPA), `application`
+  (`port/in` use cases, `port/out` repositories, `*Service` implementations) and `adapter`
+  (`in/web`, `in/csv`, `out/persistence`). Dependencies point inward only; `domain` and `application`
+  never import from `adapter`.
