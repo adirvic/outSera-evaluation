@@ -1,0 +1,7 @@
+year;title;studios;producers;winner
+2000;Movie A;Studio;Producer A;yes
+2001;Movie B;Studio;Producer A;Sim
+2002;Movie C;Studio;Producer A;no
+2005;Movie D;Studio;Producer A;true
+2006;Movie E;Studio;Producer B;Y
+2008;Movie F;Studio;Producer B;yes

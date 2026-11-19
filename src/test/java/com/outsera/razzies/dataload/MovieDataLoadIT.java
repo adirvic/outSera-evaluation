@@ -2,6 +2,7 @@ package com.outsera.razzies.dataload;
 
 import com.outsera.razzies.IntegrationTest;
 import com.outsera.razzies.RazziesApiApplication;
+import com.outsera.razzies.dataload.adapter.in.csv.InvalidMovieCsvException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.builder.SpringApplicationBuilder;
